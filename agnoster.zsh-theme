@@ -72,7 +72,7 @@ prompt_context() {
   local user=`whoami`
 
   if [[ "$user" != "$DEFAULT_USER" || -n "$SSH_CONNECTION" ]]; then
-    prompt_segment $PRIMARY_FG default " %(!.%{%F{yellow}%}.)$user@%m "
+    prompt_segment $PRIMARY_FG default "%(!.%{%F{yellow}%}.)$user@%m "
   fi
 }
 
@@ -89,7 +89,7 @@ prompt_git() {
       ref="${ref} $PLUSMINUS"
     else
       color=green
-      ref="${ref} "
+      ref="${ref}"
     fi
     if [[ "${ref/.../}" == "$ref" ]]; then
       ref="$BRANCH $ref"
@@ -97,23 +97,34 @@ prompt_git() {
       ref="$DETACHED ${ref/.../}"
     fi
     prompt_segment $color $PRIMARY_FG
-    print -Pn " $ref"
+    print -Pn " $ref "
   fi
 }
 
 # Dir: current working directory
 prompt_dir() {
-  prompt_segment blue $PRIMARY_FG ' %~ '
+  prompt_segment blue $PRIMARY_FG ' %3~ ' # omit number for full path
+}
+
+# Virtualenv: current working virtualenv
+prompt_virtualenv() {
+  local virtualenv_path="$VIRTUAL_ENV"
+  if [[ -n $virtualenv_path && -n $VIRTUAL_ENV_DISABLE_PROMPT ]]; then
+    prompt_segment blue $PRIMARY_FG "(`basename $virtualenv_path`)"
+  fi
 }
 
 # Status:
 # - was there an error
+# - am I in a nested shell
 # - am I root
-# - are there background jobs?
+# - are there background jobs
 prompt_status() {
   local symbols
   symbols=()
-  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}$CROSS"
+  [[ $RETVAL -eq 0 ]] && symbols+="%{%F{green}%}λ" # ❖
+  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}λ" # ✘ or $CROSS
+  [[ $SHLVL -ge 2 ]] && symbols+=${SHLVL}
   [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}$LIGHTNING"
   [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}$GEAR"
 
@@ -125,6 +136,7 @@ prompt_agnoster_main() {
   RETVAL=$?
   CURRENT_BG='NONE'
   prompt_status
+  prompt_virtualenv
   prompt_context
   prompt_dir
   prompt_git
@@ -133,7 +145,9 @@ prompt_agnoster_main() {
 
 prompt_agnoster_precmd() {
   vcs_info
-  PROMPT='%{%f%b%k%}$(prompt_agnoster_main) '
+  PROMPT='
+%{%f%b%k%}$(prompt_agnoster_main) '
+  # RPROMPT='%*'
 }
 
 prompt_agnoster_setup() {
