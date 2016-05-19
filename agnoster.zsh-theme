@@ -78,26 +78,37 @@ prompt_context() {
 
 # Git: branch/detached head, dirty status
 prompt_git() {
-  local color ref
+  local color ref refname mode repo_path
   is_dirty() {
     test -n "$(git status --porcelain --ignore-submodules)"
   }
-  ref="$vcs_info_msg_0_"
-  if [[ -n "$ref" ]]; then
+  repo_path=$(git rev-parse --git-dir 2>/dev/null)
+  if $(git rev-parse --is-inside-work-tree >/dev/null 2>&1); then
+    # coloration
     if is_dirty; then
       color=yellow
-      ref="${ref} $PLUSMINUS"
     else
       color=green
-      ref="${ref}"
     fi
-    if [[ "${ref/.../}" == "$ref" ]]; then
-      ref="$BRANCH $ref"
+    # ref parsing
+    refname=$(git symbolic-ref HEAD 2> /dev/null)
+    # branch type
+    if [[ $refname ]]; then
+      ref="$BRANCH $refname"
     else
-      ref="$DETACHED ${ref/.../}"
+      ref="$DETACHED $(git rev-parse --short HEAD 2> /dev/null)"
     fi
+    # git mode
+    if [[ -e "${repo_path}/BISECT_LOG" ]]; then
+      mode=" <B>"
+    elif [[ -e "${repo_path}/MERGE_HEAD" ]]; then
+      mode=" >M<"
+    elif [[ -e "${repo_path}/rebase" || -e "${repo_path}/rebase-apply" || -e "${repo_path}/rebase-merge" || -e "${repo_path}/../.dotest" ]]; then
+      mode=" >R>"
+    fi
+    # final output
     prompt_segment $color $PRIMARY_FG
-    print -Pn "$ref"
+    print -Pn "${ref/refs\/heads\//}${vcs_info_msg_0_%% }${mode}"
   fi
 }
 
@@ -159,9 +170,12 @@ prompt_agnoster_setup() {
   add-zsh-hook precmd prompt_agnoster_precmd
 
   zstyle ':vcs_info:*' enable git
-  zstyle ':vcs_info:*' check-for-changes false
-  zstyle ':vcs_info:git*' formats '%b'
-  zstyle ':vcs_info:git*' actionformats '%b (%a)'
+  zstyle ':vcs_info:*' get-revision true
+  zstyle ':vcs_info:*' check-for-changes true
+  zstyle ':vcs_info:*' stagedstr '✚'
+  zstyle ':vcs_info:*' unstagedstr '●'
+  zstyle ':vcs_info:git*' formats ' %u%c' # %b for branch name
+  zstyle ':vcs_info:git*' actionformats ' %u%c' # %a for action
 }
 
 prompt_agnoster_setup "$@"
