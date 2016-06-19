@@ -124,6 +124,21 @@ prompt_virtualenv() {
   fi
 }
 
+# Braille job counter by https://github.com/dekz/prompt/
+prompt_jobs () {
+  indicators=("⠂" "⠃" "⠇" "⠗" "⠷" "⠿")
+
+  _jobs=$(jobs -l | wc -l | sed -E 's/\ +$//' | sed -E 's/^\ +//')
+  indicator=${indicators[${_jobs}]}
+
+  if [[ "$indicator" == "" && ("${_jobs}" -gt 0) ]]; then
+    # Too many jobs to display
+    indicator="⠿"
+  fi
+
+  [ -n "$indicator" ] && prompt_segment $PRIMARY_FG default "%F{magenta}$indicator"
+}
+
 # Status:
 # - was there an error
 # - am I in a nested shell
@@ -135,7 +150,7 @@ prompt_status() {
   [[ $RETVAL -eq 0 ]] && symbols+="%{%F{green}%}λ" # ❖
   [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}λ" # ✘ or $CROSS
   [[ $SHLVL -ge 2 ]] && symbols+=${SHLVL}
-  [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}$GEAR"
+  # [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}$GEAR" # replaced by prompt_jobs
   [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}$LIGHTNING"
 
   [[ -n "$symbols" ]] && prompt_segment $PRIMARY_FG default "$symbols"
@@ -146,6 +161,7 @@ prompt_agnoster_main() {
   RETVAL=$?
   CURRENT_BG='NONE'
   prompt_status
+  prompt_jobs
   prompt_virtualenv
   prompt_context
   prompt_dir
