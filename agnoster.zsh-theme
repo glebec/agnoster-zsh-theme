@@ -148,7 +148,7 @@ prompt_n() {
   if [[ $(type n) =~ 'n is /usr/local/bin/n' ]]; then
     local v=$(node -v)
   fi
-  [[ $v != '' && (-n $vcs_info_msg_0_) ]] && prompt_segment white black "⬡ $v"
+  [[ $v != '' && (-n $vcs_info_msg_0_) ]] && prompt_segment cyan black "⬡ $v"
 }
 
 # Status:
