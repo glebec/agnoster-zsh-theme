@@ -78,7 +78,7 @@ prompt_context() {
 
 # Git: branch/detached head, dirty status
 prompt_git() {
-  local color ref mode repo_path
+  local color ref state mode repo_path
   is_dirty() {
     test -n "$(git status --porcelain --ignore-submodules)"
   }
@@ -105,9 +105,13 @@ prompt_git() {
     elif [[ -e "${repo_path}/rebase" || -e "${repo_path}/rebase-apply" || -e "${repo_path}/rebase-merge" || -e "${repo_path}/../.dotest" ]]; then
       mode=" >R>"
     fi
+    # staged, mixed, or clean
+    if [[ -n $vcs_info_msg_1_ ]]; then
+      state=" ${vcs_info_msg_1_}"
+    fi
     # final output
     prompt_segment $color $PRIMARY_FG
-    print -Pn "${ref} ${vcs_info_msg_1_%% }${mode}"
+    print -Pn "${ref}${state}${mode}"
   fi
 }
 
@@ -139,6 +143,14 @@ prompt_jobs () {
   [ -n "$indicator" ] && prompt_segment $PRIMARY_FG default "%F{magenta}$indicator"
 }
 
+# Node: current Node version
+prompt_n() {
+  if [[ $(type n) =~ 'n is /usr/local/bin/n' ]]; then
+    local v=$(node -v)
+  fi
+  [[ $v != '' && (-n $vcs_info_msg_0_) ]] && prompt_segment white black "⬡ $v"
+}
+
 # Status:
 # - was there an error
 # - am I in a nested shell
@@ -165,6 +177,7 @@ prompt_agnoster_main() {
   prompt_virtualenv
   prompt_context
   prompt_dir
+  prompt_n
   prompt_git
   prompt_end
 }
