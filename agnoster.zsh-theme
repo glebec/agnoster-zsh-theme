@@ -67,13 +67,67 @@ prompt_end() {
 ### Prompt components
 # Each component will draw itself, and hide itself if no information needs to be shown
 
+# Status:
+# - was there an error
+# - am I in a nested shell
+# - am I root
+# - are there background jobs
+prompt_status() {
+  local symbols
+  symbols=()
+  [[ $RETVAL -eq 0 ]] && symbols+="%{%F{green}%}λ" # ❖
+  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}λ" # ✘ or $CROSS
+  [[ $SHLVL -ge 2 ]] && symbols+=${SHLVL}
+  # [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}$GEAR" # replaced by prompt_jobs
+  # [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}$LIGHTNING" # moved to prompt_context
+
+  [[ -n "$symbols" ]] && prompt_segment $PRIMARY_FG default "$symbols"
+}
+
+# Braille job counter by https://github.com/dekz/prompt/
+prompt_jobs () {
+  indicators=("⠂" "⠃" "⠇" "⠗" "⠷" "⠿")
+
+  _jobs=$(jobs -l | wc -l | sed -E 's/\ +$//' | sed -E 's/^\ +//')
+  indicator=${indicators[${_jobs}]}
+
+  if [[ "$indicator" == "" && ("${_jobs}" -gt 0) ]]; then
+    # Too many jobs to display
+    indicator="⠿"
+  fi
+
+  [ -n "$indicator" ] && prompt_segment $PRIMARY_FG default "%F{magenta}$indicator"
+}
+
+# Node: current Node version
+prompt_n() {
+  if [[ $(type n) =~ 'n is /usr/local/bin/n' ]]; then
+    local v=$(node -v)
+  fi
+  [[ $v != '' ]] && prompt_segment black cyan "$v" # ⬡
+}
+
+# Virtualenv: current working virtualenv
+prompt_virtualenv() {
+  local virtualenv_path="$VIRTUAL_ENV"
+  if [[ -n $virtualenv_path && -n $VIRTUAL_ENV_DISABLE_PROMPT ]]; then
+    prompt_segment blue $PRIMARY_FG "(`basename $virtualenv_path`)"
+  fi
+}
+
 # Context: user@hostname (who am I and where am I)
 prompt_context() {
   local user=`whoami`
-
+  local root
   if [[ "$user" != "$DEFAULT_USER" || -n "$SSH_CONNECTION" ]]; then
-    prompt_segment $PRIMARY_FG default "%(!.%{%F{yellow}%}.)$user @ %m"
+    [[ $UID -eq 0 ]] && user="$LIGHTNING root"
+    prompt_segment black yellow "$user @ %m"
   fi
+}
+
+# Dir: current working directory
+prompt_dir() {
+  prompt_segment blue $PRIMARY_FG '%3~' # omit number for full path
 }
 
 # Git: branch/detached head, dirty status
@@ -115,69 +169,16 @@ prompt_git() {
   fi
 }
 
-# Dir: current working directory
-prompt_dir() {
-  prompt_segment blue $PRIMARY_FG '%3~' # omit number for full path
-}
-
-# Virtualenv: current working virtualenv
-prompt_virtualenv() {
-  local virtualenv_path="$VIRTUAL_ENV"
-  if [[ -n $virtualenv_path && -n $VIRTUAL_ENV_DISABLE_PROMPT ]]; then
-    prompt_segment blue $PRIMARY_FG "(`basename $virtualenv_path`)"
-  fi
-}
-
-# Braille job counter by https://github.com/dekz/prompt/
-prompt_jobs () {
-  indicators=("⠂" "⠃" "⠇" "⠗" "⠷" "⠿")
-
-  _jobs=$(jobs -l | wc -l | sed -E 's/\ +$//' | sed -E 's/^\ +//')
-  indicator=${indicators[${_jobs}]}
-
-  if [[ "$indicator" == "" && ("${_jobs}" -gt 0) ]]; then
-    # Too many jobs to display
-    indicator="⠿"
-  fi
-
-  [ -n "$indicator" ] && prompt_segment $PRIMARY_FG default "%F{magenta}$indicator"
-}
-
-# Node: current Node version
-prompt_n() {
-  if [[ $(type n) =~ 'n is /usr/local/bin/n' ]]; then
-    local v=$(node -v)
-  fi
-  [[ $v != '' && (-n $vcs_info_msg_0_) ]] && prompt_segment cyan black "⬡ $v"
-}
-
-# Status:
-# - was there an error
-# - am I in a nested shell
-# - am I root
-# - are there background jobs
-prompt_status() {
-  local symbols
-  symbols=()
-  [[ $RETVAL -eq 0 ]] && symbols+="%{%F{green}%}λ" # ❖
-  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}λ" # ✘ or $CROSS
-  [[ $SHLVL -ge 2 ]] && symbols+=${SHLVL}
-  # [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}$GEAR" # replaced by prompt_jobs
-  [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}$LIGHTNING"
-
-  [[ -n "$symbols" ]] && prompt_segment $PRIMARY_FG default "$symbols"
-}
-
 ## Main prompt
 prompt_agnoster_main() {
   RETVAL=$?
   CURRENT_BG='NONE'
   prompt_status
   prompt_jobs
+  prompt_n
   prompt_virtualenv
   prompt_context
   prompt_dir
-  prompt_n
   prompt_git
   prompt_end
 }
