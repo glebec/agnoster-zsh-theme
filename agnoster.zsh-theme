@@ -38,6 +38,7 @@ DETACHED="\u27a6"
 CROSS="\u2718"
 LIGHTNING="\u26a1"
 GEAR="\u27f3" # gear "\u2699", open arrow "\u21bb", gap arrow "\u27f3"
+SHOW_CURSOR="\x1B[?25h"
 
 # Begin a segment
 # Takes two arguments, background and foreground. Both can be omitted,
@@ -77,8 +78,8 @@ prompt_end() {
 prompt_status() {
   local symbols
   symbols=()
-  [[ $RETVAL -eq 0 ]] && symbols+="%{%F{green}%}λ" # ❖
-  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}λ" # ✘ or $CROSS
+  [[ $RETVAL -eq 0 ]] && symbols+="%{%F{green}%}𝝀" # ❖
+  [[ $RETVAL -ne 0 ]] && symbols+="%{%F{red}%}𝝀" # ✘ or $CROSS
   [[ $SHLVL -ge 2 ]] && symbols+=${SHLVL}
   # [[ $(jobs -l | wc -l) -gt 0 ]] && symbols+="%{%F{cyan}%}$GEAR" # replaced by prompt_jobs
   # [[ $UID -eq 0 ]] && symbols+="%{%F{yellow}%}$LIGHTNING" # moved to prompt_context
@@ -123,7 +124,7 @@ prompt_context() {
   local root
   if [[ "$user" != "$DEFAULT_USER" || -n "$SSH_CONNECTION" ]]; then
     [[ $UID -eq 0 ]] && user="$LIGHTNING root"
-    prompt_segment black yellow "$user @ %m"
+    prompt_segment black white "$user @ %m"
   fi
 }
 
@@ -135,10 +136,14 @@ prompt_dir() {
 # Git: branch/detached head, dirty status
 prompt_git() {
   local color ref state mode repo_path
+  # proper git stuff
   is_dirty() {
     test -n "$(git status --porcelain --ignore-submodules)"
   }
   if [[ -n $vcs_info_msg_0_ ]]; then
+    ref=$vcs_info_msg_0_
+    # TODO: move/improve this hack (bail if mercurial)
+    if [[ ${ref:0:1} == "☿" ]]; then return 0; fi
     # coloration
     if is_dirty; then
       color=yellow
@@ -146,7 +151,6 @@ prompt_git() {
       color=green
     fi
     # ref parsing
-    ref=$vcs_info_msg_0_
     if [[ ${ref: -3} == "..." ]]; then # detached commits end in '...'
       ref="$DETACHED $(git rev-parse --short HEAD 2> /dev/null)"
     else
@@ -171,6 +175,23 @@ prompt_git() {
   fi
 }
 
+prompt_hg() {
+  local hg_status color
+  # TODO: fix this hack (bail if git)
+  if ! [[ ${vcs_info_msg_0_:0:1} == "☿" ]]; then return 0; fi
+  # mercurial proper
+  hg_status=`hg st`
+  if `echo $hg_status | grep -q "^\?"`; then
+    color=red
+  elif `echo $hg_status | grep -q "^[MA]"`; then
+    color=yellow
+  else
+    color=green
+  fi
+  prompt_segment $color $PRIMARY_FG
+  print -Pn $vcs_info_msg_0_
+}
+
 ## Main prompt
 prompt_agnoster_main() {
   RETVAL=$?
@@ -183,7 +204,9 @@ prompt_agnoster_main() {
   prompt_virtualenv
   prompt_dir
   prompt_git
+  prompt_hg
   prompt_end
+  # echo $SHOW_CURSOR
 }
 
 prompt_agnoster_precmd() {
@@ -201,13 +224,22 @@ prompt_agnoster_setup() {
 
   add-zsh-hook precmd prompt_agnoster_precmd
 
-  zstyle ':vcs_info:*' enable git
+  ## general
+  zstyle ':vcs_info:*' enable git hg
   zstyle ':vcs_info:*' get-revision true
   zstyle ':vcs_info:*' check-for-changes true
   zstyle ':vcs_info:*' stagedstr '✚'
   zstyle ':vcs_info:*' unstagedstr '●'
-  zstyle ':vcs_info:git*' formats '%b' '%u%c' # branch / (un)staged
-  zstyle ':vcs_info:git*' actionformats '%b' '%u%c' # %a for action
+  ## git
+  zstyle ':vcs_info:git:*' formats '%b' '%u%c' # branch / (un)staged
+  zstyle ':vcs_info:git:*' actionformats '%b' '%u%c' # %a for action
+  ## hg
+  zstyle ':vcs_info:hg*:*' unstagedstr '±'
+  zstyle ':vcs_info:hg*:*' use-simple true # faster, but cannot get revision num or staging
+  zstyle ':vcs_info:hg*:*' branchformat '%b' # branch %b
+  # zstyle ':vcs_info:hg*:*' branchformat '%b %r' # branch %b, rev %r
+  zstyle ':vcs_info:hg*:*' hgrevformat '%r' # changeset ID %h, rev num %r
+  zstyle ':vcs_info:hg*:*' formats "☿ %b%c%u" # vcs %s, branch %b, rev %i, staged/unstaged %c%u, misc %m
 }
 
 prompt_agnoster_setup "$@"
